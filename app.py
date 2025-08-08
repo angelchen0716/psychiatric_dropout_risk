@@ -1,10 +1,10 @@
-# ✅ psychiatric_dropout demo App（最終穩定版：使用 DMatrix 且繞過欄位驗證）
+# ✅ psychiatric_dropout demo App（穩定版：修復 SHAP 畫圖錯誤）
 import streamlit as st
 import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
-import xgboost as xgb  # ✅ 加入 xgboost for DMatrix
+import xgboost as xgb
 
 st.set_page_config(page_title="Psychiatric Dropout Risk", layout="wide")
 st.title("🧠 Psychiatric Dropout Risk Predictor")
@@ -53,7 +53,7 @@ for col in user_input.columns:
     if col in X_final.columns:
         X_final.at[0, col] = user_input[col][0]
 
-# 使用 numpy 並避免特徵驗證錯誤（透過 booster + validate_features=False）
+# 使用 numpy 並避免特徵驗證錯誤（透過 validate_features=False）
 prob = model.predict_proba(X_final, validate_features=False)[0][1]
 st.metric("Predicted Dropout Risk (within 3 months)", f"{prob*100:.1f}%")
 
@@ -65,11 +65,12 @@ elif prob > 0.4:
 else:
     st.success("🟢 Low Risk")
 
-# SHAP 解釋圖
+# SHAP 解釋圖（避免畫圖錯誤）
 st.subheader("SHAP Explanation")
 explainer = shap.Explainer(model)
 shap_values = explainer(X_final)
+fig = plt.figure()
 shap.summary_plot(shap_values, X_final, show=False)
-st.pyplot()
+st.pyplot(fig)
 
 st.caption("Model trained on simulated data reflecting clinical dropout risk factors. Not for clinical use.")
