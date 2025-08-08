@@ -1,9 +1,10 @@
-# ✅ psychiatric_dropout demo App（最終修正版：使用 Booster 避免特徵驗證錯誤）
+# ✅ psychiatric_dropout demo App（最終穩定版：使用 DMatrix 且繞過欄位驗證）
 import streamlit as st
 import pandas as pd
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import xgboost as xgb  # ✅ 加入 xgboost for DMatrix
 
 st.set_page_config(page_title="Psychiatric Dropout Risk", layout="wide")
 st.title("🧠 Psychiatric Dropout Risk Predictor")
@@ -45,17 +46,15 @@ user_input = pd.DataFrame({
     f'self_harm_during_admission_{selfharm_adm}': [1],
 })
 
-# 轉成 numpy array 並填入順序欄位值
-X_final = sample.iloc[[0]].copy()
-X_final.iloc[0] = 0  # 全部歸零
+# 對齊 sample 欄位
+X_final = pd.DataFrame(columns=sample.columns)
+X_final.loc[0] = 0  # 全欄位預設為 0
 for col in user_input.columns:
     if col in X_final.columns:
-        X_final.iloc[0][col] = user_input[col][0]
+        X_final.at[0, col] = user_input[col][0]
 
-# 預測（使用 Booster 避免欄位驗證錯誤）
-import xgboost as xgb  # ✅ 新增這行（在 import 區塊也可以放）
-X_input = xgb.DMatrix(X_final.to_numpy())
-prob = model.get_booster().predict(X_input)[0]
+# 使用 numpy 並避免特徵驗證錯誤（透過 booster + validate_features=False）
+prob = model.predict_proba(X_final, validate_features=False)[0][1]
 st.metric("Predicted Dropout Risk (within 3 months)", f"{prob*100:.1f}%")
 
 # 分級提示
