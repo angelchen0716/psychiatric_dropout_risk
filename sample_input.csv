@@ -1,0 +1,6 @@
+age,length_of_stay,num_previous_admissions,medication_compliance_score,family_support_score,post_discharge_followups,gender_Female,gender_Male,diagnosis_Bipolar,diagnosis_Dementia,diagnosis_Depression,diagnosis_Personality Disorder,diagnosis_Schizophrenia,diagnosis_Substance Use Disorder,has_social_worker_No,has_social_worker_Yes,has_recent_self_harm_No,has_recent_self_harm_Yes,self_harm_during_admission_No,self_harm_during_admission_Yes
+56,57,0,0.7,3.1,0,False,True,False,False,True,False,False,False,True,False,False,True,True,False
+56,57,0,0.7,3.1,0,False,True,False,False,True,False,False,False,True,False,False,True,True,False
+56,57,0,0.7,3.1,0,False,True,False,False,True,False,False,False,True,False,False,True,True,False
+56,57,0,0.7,3.1,0,False,True,False,False,True,False,False,False,True,False,False,True,True,False
+56,57,0,0.7,3.1,0,False,True,False,False,True,False,False,False,True,False,False,True,True,False
