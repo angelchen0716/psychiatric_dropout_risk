@@ -1,70 +1,75 @@
-
+# ✅ psychiatric_dropout demo App（最終修正版：使用 Booster 避免特徵驗證錯誤）
 import streamlit as st
 import pandas as pd
-import shap
 import joblib
-from xgboost import XGBClassifier
+import shap
+import matplotlib.pyplot as plt
 
-# 標題與說明
 st.set_page_config(page_title="Psychiatric Dropout Risk", layout="wide")
 st.title("🧠 Psychiatric Dropout Risk Predictor")
-st.markdown("Estimate 3-month dropout risk after psychiatric discharge with SHAP explanations.")
 
-# 載入模型
-@st.cache_resource
-def load_model():
-    return joblib.load("dropout_model.pkl")
+# 載入模型與欄位樣板
+model = joblib.load("dropout_model.pkl")
+sample = pd.read_csv("sample_input.csv")
 
-model = load_model()
+# 使用者輸入表單
+with st.sidebar:
+    st.header("Patient Info")
+    age = st.slider("Age", 18, 75, 35)
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    diagnosis = st.selectbox("Diagnosis", [
+        "Schizophrenia", "Bipolar", "Depression",
+        "Personality Disorder", "Substance Use Disorder", "Dementia"
+    ])
+    length_of_stay = st.slider("Length of Stay (days)", 1, 90, 10)
+    num_adm = st.slider("# Previous Admissions", 0, 15, 1)
+    social_worker = st.radio("Has Social Worker", ["Yes", "No"])
+    compliance = st.slider("Medication Compliance Score", 0.0, 10.0, 5.0)
+    recent_self_harm = st.radio("Recent Self-harm", ["Yes", "No"])
+    selfharm_adm = st.radio("Self-harm During Admission", ["Yes", "No"])
+    support = st.slider("Family Support Score", 0.0, 10.0, 5.0)
+    followups = st.slider("Post-discharge Followups", 0, 10, 2)
 
-# 載入 SHAP explainer
-@st.cache_resource
-def load_explainer():
-    X_sample = pd.read_csv("sample_input.csv")
-    return shap.Explainer(model), X_sample.columns.tolist()
+# 建立單筆使用者資料
+user_input = pd.DataFrame({
+    'age': [age],
+    'length_of_stay': [length_of_stay],
+    'num_previous_admissions': [num_adm],
+    'medication_compliance_score': [compliance],
+    'family_support_score': [support],
+    'post_discharge_followups': [followups],
+    f'gender_{gender}': [1],
+    f'diagnosis_{diagnosis}': [1],
+    f'has_social_worker_{social_worker}': [1],
+    f'has_recent_self_harm_{recent_self_harm}': [1],
+    f'self_harm_during_admission_{selfharm_adm}': [1],
+})
 
-explainer, feature_names = load_explainer()
+# 轉成 numpy array 並填入順序欄位值
+X_final = sample.iloc[[0]].copy()
+X_final.iloc[0] = 0  # 全部歸零
+for col in user_input.columns:
+    if col in X_final.columns:
+        X_final.iloc[0][col] = user_input[col][0]
 
-# 使用者輸入欄位
-st.sidebar.header("Input Patient Information")
-def user_input():
-    data = {
-        'age': st.sidebar.slider("Age", 18, 75, 30),
-        'gender_Female': st.sidebar.selectbox("Gender", ["Male", "Female"]) == "Female",
-        'diagnosis_Bipolar': st.sidebar.checkbox("Diagnosis: Bipolar"),
-        'diagnosis_Depression': st.sidebar.checkbox("Diagnosis: Depression"),
-        'diagnosis_Schizophrenia': True,  # Default true if others not selected
-        'length_of_stay': st.sidebar.slider("Length of stay (days)", 1, 90, 14),
-        'num_previous_admissions': st.sidebar.slider("Previous admissions", 0, 10, 2),
-        'has_social_worker_No': st.sidebar.radio("Social worker assigned?", ["Yes", "No"]) == "No",
-        'medication_compliance_score': st.sidebar.slider("Medication compliance (0-10)", 0.0, 10.0, 5.0),
-        'has_recent_self_harm_Yes': st.sidebar.checkbox("Recent self-harm history"),
-        'self_harm_during_admission_Yes': st.sidebar.checkbox("Self-harm during admission"),
-        'family_support_score': st.sidebar.slider("Family support (0–10)", 0, 10, 5),
-        'post_discharge_followups': st.sidebar.slider("Follow-ups in 30 days", 0, 5, 1)
-    }
+# 預測（使用 Booster 避免欄位驗證錯誤）
+X_input = X_final.to_numpy()
+prob = model.get_booster().predict(X_input)[0]
+st.metric("Predicted Dropout Risk (within 3 months)", f"{prob*100:.1f}%")
 
-    df = pd.DataFrame([data])
-    # One-hot adjustments
-    df['gender_Male'] = not data['gender_Female']
-    df['diagnosis_Schizophrenia'] = not (data['diagnosis_Bipolar'] or data['diagnosis_Depression'])
-    df['has_social_worker_Yes'] = not data['has_social_worker_No']
-    df['has_recent_self_harm_No'] = not data['has_recent_self_harm_Yes']
-    df['self_harm_during_admission_No'] = not data['self_harm_during_admission_Yes']
-    return df
+# 分級提示
+if prob > 0.7:
+    st.error("🔴 High Risk")
+elif prob > 0.4:
+    st.warning("🟡 Medium Risk")
+else:
+    st.success("🟢 Low Risk")
 
-input_df = user_input()
-X_final = input_df.reindex(columns=feature_names, fill_value=0)
-
-# 預測與風險顯示
-prob = model.predict_proba(X_final)[0][1]
-score = int(round(prob * 100))
-st.subheader("Predicted Dropout Risk Score")
-st.metric(label="Dropout risk (3 months)", value=f"{score}/100")
-
-# SHAP 圖
+# SHAP 解釋圖
 st.subheader("SHAP Explanation")
+explainer = shap.Explainer(model)
 shap_values = explainer(X_final)
-st.set_option('deprecation.showPyplotGlobalUse', False)
-shap.plots.waterfall(shap_values[0], max_display=8)
-st.pyplot(bbox_inches='tight')
+shap.summary_plot(shap_values, X_final, show=False)
+st.pyplot()
+
+st.caption("Model trained on simulated data reflecting clinical dropout risk factors. Not for clinical use.")
