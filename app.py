@@ -53,7 +53,8 @@ for col in user_input.columns:
         X_final.iloc[0][col] = user_input[col][0]
 
 # 預測（使用 Booster 避免欄位驗證錯誤）
-X_input = X_final.to_numpy()
+import xgboost as xgb  # ✅ 新增這行（在 import 區塊也可以放）
+X_input = xgb.DMatrix(X_final.to_numpy())
 prob = model.get_booster().predict(X_input)[0]
 st.metric("Predicted Dropout Risk (within 3 months)", f"{prob*100:.1f}%")
 
